@@ -3,6 +3,7 @@
 
 
 int main(){
-    sniffer obj("log.txt");
+    sniffer obj("log.txt", 1);
     obj.sniff();
+    obj.~sniffer();
 }
