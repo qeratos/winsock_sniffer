@@ -1,6 +1,18 @@
 #include "sniffer.h"
-#define SIO_RCVALL 0x98000001
 
+
+void sniffer::advance_mode(){
+	if (advance_mode_flag == true) {
+		cout << "[sniffer]: Advance Mode ENABLE" << endl;
+		thread thr([&]() {
+			//cout << GetCurrentThreadId();
+			while (true) {
+				mciSendString("play sniff.mp3 wait", NULL, 0, NULL);
+			}
+		});
+		thr.detach();
+	}
+}
 
 void sniffer::socket_init() {
 	WSADATA wsadata;
@@ -24,7 +36,6 @@ void sniffer::socket_init() {
 
 	DWORD flag = TRUE;
 	ioctlsocket(sock, SIO_RCVALL, &flag);
-
 
 	//BOOL bOptVal = TRUE;
 	//setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char*)&bOptVal, sizeof(BOOL));
@@ -120,9 +131,24 @@ sniffer::sniffer(const char* file_name) {
 	else {
 		cout << GetLastError() << endl;
 	}
+	advance_mode();
+}
+
+sniffer::sniffer(const char* file_name, bool advance_mode_flag) {
+	this->advance_mode_flag = advance_mode_flag;
+	socket_init();
+	file.open(file_name, std::ios::app);
+	if (file.is_open()) {
+		log = true;
+	}
+	else {
+		cout << GetLastError() << endl;
+	}
+	advance_mode();
 }
 
 void sniffer::sniff() {
+	cout << "[sniffer]: Start SNIFFING" << endl;
 	bool flag = true;
 	IN_ADDR in_addr;
 
@@ -131,8 +157,7 @@ void sniffer::sniff() {
 			IPHeader* hdr = (IPHeader*)buffer;
 			WORD size = (hdr->iph_length << 8) + (hdr->iph_length >> 8);
 			
-
-			//if (size >= 60 && size <= 1500) {
+			if (size >= 60 && size <= 1500) {
 				in_addr.s_addr = hdr->iph_dest;
 				if (log == true) {
 					write_log(buffer, file, hdr, in_addr, size);
@@ -170,12 +195,13 @@ void sniffer::sniff() {
 
 				}
 				cout << endl;
-			//}
+			}
 		}
 	}
 }
 
 sniffer::~sniffer(){
+	thr.join();
 	file.close();
 	closesocket(sock);
 	WSACleanup();
